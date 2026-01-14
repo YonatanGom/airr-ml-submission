@@ -3,8 +3,8 @@
 XGBoost Specialist: Statistical & Frequency Features
 
 Two specialists in one:
-- XGB-Stat: Statistical features (entropy, gini, moments)
-- XGB-Freq: Frequency features (V/J/AA/length distributions)
+- Statistical: Statistical features (entropy, gini, moments)
+- Frequency: Frequency features (V/J/AA/length distributions)
 
 CRITICAL: Feature selection happens INSIDE each CV fold using only
 the training fold data (no data leakage).

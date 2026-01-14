@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-attTCR Specialist: Chi-squared based TCR selection.
+ReactiveTCR Specialist: Chi-squared based TCR selection.
 
 CRITICAL: Chi-squared scoring and reactive TCR selection happen
 INSIDE each CV fold, using ONLY the training fold data (no data leakage).
