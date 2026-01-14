@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Base Specialists: Physicist, Sniper, Ecologist
+Base Specialists: Physicochemical, Kmer, VJGene
 
 These are simple LogisticRegression classifiers with L1 regularization,
 each trained on different feature types:
-- Physicist: Physics features (charge, size, ring, flexibility patterns)
-- Sniper: Sequence features (k-mers)
-- Ecologist: Gene features (V/J gene usage)
+- Physicochemical: Physics features (charge, size, ring, flexibility patterns)
+- Kmer: Sequence features (k-mers)
+- VJGene: Gene features (V/J gene usage)
 
 The only difference between them is the feature input and C value.
 """
@@ -17,14 +17,14 @@ from scipy import sparse
 
 
 # Default hyperparameters (from original model)
-PHYSICIST_C = 0.15
-SNIPER_C = 0.20
-ECOLOGIST_C = 0.50
+PHYSICOCHEMICAL_C = 0.15
+KMER_C = 0.20
+VJGENE_C = 0.50
 
 
-def train_physicist(X_train, y_train, X_val, seed=42):
+def train_physicochemical(X_train, y_train, X_val, seed=42):
     """
-    Train Physicist specialist on physics features.
+    Train Physicochemical specialist on physics features.
     
     Args:
         X_train: Training physics features (sparse or dense)
@@ -39,7 +39,7 @@ def train_physicist(X_train, y_train, X_val, seed=42):
     scaler = StandardScaler(with_mean=False)
     clf = LogisticRegression(
         penalty='l1',
-        C=PHYSICIST_C,
+        C=PHYSICOCHEMICAL_C,
         solver='liblinear',
         class_weight='balanced',
         random_state=seed,
@@ -55,9 +55,9 @@ def train_physicist(X_train, y_train, X_val, seed=42):
     return val_preds, (clf, scaler)
 
 
-def train_sniper(X_train, y_train, X_val, seed=42):
+def train_kmer(X_train, y_train, X_val, seed=42):
     """
-    Train Sniper specialist on sequence k-mer features.
+    Train Kmer specialist on sequence k-mer features.
     
     Args:
         X_train: Training sequence features (sparse or dense)
@@ -72,7 +72,7 @@ def train_sniper(X_train, y_train, X_val, seed=42):
     scaler = StandardScaler(with_mean=False)
     clf = LogisticRegression(
         penalty='l1',
-        C=SNIPER_C,
+        C=KMER_C,
         solver='liblinear',
         class_weight='balanced',
         random_state=seed,
@@ -88,9 +88,9 @@ def train_sniper(X_train, y_train, X_val, seed=42):
     return val_preds, (clf, scaler)
 
 
-def train_ecologist(X_train, y_train, X_val, seed=42):
+def train_vjgene(X_train, y_train, X_val, seed=42):
     """
-    Train Ecologist specialist on gene features.
+    Train VJGene specialist on gene features.
     
     Args:
         X_train: Training gene features (sparse or dense)
@@ -105,7 +105,7 @@ def train_ecologist(X_train, y_train, X_val, seed=42):
     scaler = StandardScaler(with_mean=False)
     clf = LogisticRegression(
         penalty='l1',
-        C=ECOLOGIST_C,
+        C=VJGENE_C,
         solver='liblinear',
         class_weight='balanced',
         random_state=seed,
@@ -159,10 +159,10 @@ def train_logreg_specialist(X_train, y_train, X_val, C, seed=42):
     """
     Generic LogisticRegression specialist.
     
-    Can be used as alternative to specific train_physicist/sniper/ecologist:
-        train_logreg_specialist(X_phys, y, X_phys_val, C=0.15)  # = Physicist
-        train_logreg_specialist(X_seq, y, X_seq_val, C=0.20)   # = Sniper
-        train_logreg_specialist(X_gene, y, X_gene_val, C=0.50) # = Ecologist
+    Can be used as alternative to specific functions:
+        train_logreg_specialist(X_phys, y, X_phys_val, C=0.15)  # = Physicochemical
+        train_logreg_specialist(X_seq, y, X_seq_val, C=0.20)   # = Kmer
+        train_logreg_specialist(X_gene, y, X_gene_val, C=0.50) # = VJGene
     
     Args:
         X_train: Training features

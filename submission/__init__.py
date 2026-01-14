@@ -5,12 +5,12 @@ This package implements a hybrid stacking ensemble model for predicting
 immune states from T-cell receptor (TCR) repertoire data.
 
 6 Specialists:
-- Physicist: Physics-based features (charge, size, ring, flexibility)
-- Sniper: K-mer sequence features (k=4,5,6)
-- Ecologist: V/J gene features
-- attTCR: Chi-squared based reactive TCR selection
-- XGB-Stat: Statistical features (entropy, moments)
-- XGB-Freq: Frequency features (V/J/AA distributions)
+- Physicochemical: Physics-based features (charge, size, ring, flexibility)
+- Kmer: K-mer sequence features (k=4,5,6)
+- VJGene: V/J gene features
+- ReactiveTCR: Chi-squared based reactive TCR selection
+- Statistical: Statistical features (entropy, moments)
+- Frequency: Frequency features (V/J/AA distributions)
 
 1 Head: LogisticRegressionCV with L1 regularization
 """

@@ -10,12 +10,12 @@ This solution uses a **6-specialist stacking ensemble** where each specialist ex
 
 | Specialist | Features | Description |
 |------------|----------|-------------|
-| **Physicist** | Physics-based k-mers (k=3,4) | Charge, size, ring (aromatic), and flexibility patterns |
-| **Sniper** | Sequence k-mers (k=4,5,6) | Direct amino acid sequence patterns |
-| **Ecologist** | V/J gene usage | Gene segment frequencies |
-| **attTCR** | Chi-squared selection | Identifies reactive TCR combinations (CDR3 + V-gene) |
-| **XGB-Stat** | Statistical features | Entropy, Gini-Simpson diversity, length moments |
-| **XGB-Freq** | Frequency features | V/J/AA/length distributions |
+| **Physicochemical** | Physics-based k-mers (k=3,4) | Charge, size, ring (aromatic), and flexibility patterns |
+| **Kmer** | Sequence k-mers (k=4,5,6) | Direct amino acid sequence patterns |
+| **VJGene** | V/J gene usage | Gene segment frequencies |
+| **ReactiveTCR** | Chi-squared selection | Identifies reactive TCR combinations (CDR3 + V-gene) |
+| **Statistical** | Statistical features | Entropy, Gini-Simpson diversity, length moments |
+| **Frequency** | Frequency features | V/J/AA/length distributions |
 
 ### Meta-Learner (HEAD)
 
@@ -25,12 +25,11 @@ This solution uses a **6-specialist stacking ensemble** where each specialist ex
 
 ### Key Design Decisions
 
-- **No data leakage**: Feature selection (attTCR chi-squared, XGB effect sizes) happens inside CV folds using only training data
+- **No data leakage**: Feature selection (ReactiveTCR chi-squared, effect sizes) happens inside CV folds using only training data
 - **Single-pass file reading**: Each file is read once and cached for all feature extractors
 - **Parallel processing**: All specialists trained in parallel across CV folds
 
 ## Installation
-
 ```bash
 pip install -r requirements.txt
 ```
@@ -48,7 +47,6 @@ pip install -r requirements.txt
 ## Usage
 
 ### Command Line Interface
-
 ```bash
 # Single dataset
 python3 -m submission.main \
@@ -68,7 +66,6 @@ python3 -m submission.main \
 ```
 
 ### Python API
-
 ```python
 from submission.predictor import ImmuneStatePredictor
 from submission.utils import get_dataset_pairs, concatenate_output_files
@@ -123,23 +120,21 @@ The model produces two types of output files per dataset:
 | j_call | J gene call |
 
 ## Project Structure
-
 ```
 submission/
 ├── __init__.py              # Package initialization
 ├── main.py                  # CLI entry point
 ├── predictor.py             # ImmuneStatePredictor class
 ├── feature_extraction.py    # Base feature extraction (k-mers, physics, genes)
-├── base_specialists.py      # Physicist, Sniper, Ecologist specialists
-├── atttcr_specialist.py     # attTCR chi-squared specialist
-├── xgboost_specialist.py    # XGB-Stat and XGB-Freq specialists
+├── base_specialists.py      # Physicochemical, Kmer, VJGene specialists
+├── atttcr_specialist.py     # ReactiveTCR chi-squared specialist
+├── xgboost_specialist.py    # Statistical and Frequency specialists
 └── utils.py                 # Utility functions (data loading, saving)
 ```
 
 ## Docker
 
 Build and run with Docker:
-
 ```bash
 # Build
 docker build -t immune-predictor .

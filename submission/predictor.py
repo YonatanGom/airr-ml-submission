@@ -3,12 +3,12 @@
 ImmuneStatePredictor: Hybrid Stacking Ensemble Model
 
 6 Specialists:
-- Physicist: Physics features (charge, size, ring, flexibility)
-- Sniper: K-mer sequence features
-- Ecologist: V/J gene features
-- attTCR: Chi-squared based reactive TCR selection
-- XGB-Stat: Statistical features (entropy, moments)
-- XGB-Freq: Frequency features (V/J/AA distributions)
+- Physicochemical: Physics features (charge, size, ring, flexibility)
+- Kmer: K-mer sequence features
+- VJGene: V/J gene features
+- ReactiveTCR: Chi-squared based reactive TCR selection
+- Statistical: Statistical features (entropy, moments)
+- Frequency: Frequency features (V/J/AA distributions)
 
 1 Head: LogisticRegressionCV with L1 regularization
 
@@ -36,7 +36,7 @@ from .feature_extraction import (
     TRANS_CHARGE, TRANS_SIZE, get_kmers
 )
 from .base_specialists import (
-    train_physicist, train_sniper, train_ecologist,
+    train_physicochemical, train_kmer, train_vjgene,
     predict_with_model, get_model_weights
 )
 from .atttcr_specialist import (
@@ -180,7 +180,7 @@ def _process_test_file_unified(args):
     """
     Process a single test file to extract ALL features in one pass:
     1. Base features (seq, gene, phys) for vectorization
-    2. TCR combinations for attTCR
+    2. TCR combinations for ReactiveTCR
     3. Raw counts for XGB features
     
     Args:
@@ -222,7 +222,7 @@ def _process_test_file_unified(args):
         # === Base features (for vectorization) ===
         d_seq, d_gene, d_phys = {}, {}, {}
         
-        # === attTCR (TCR combinations) ===
+        # === ReactiveTCR (TCR combinations) ===
         tcr_combinations = []
         
         # === XGB raw counts ===
@@ -297,7 +297,7 @@ def _process_test_file_unified(args):
                     if idx is not None:
                         d_phys[idx] = d_phys.get(idx, 0) + 1
             
-            # === 2. attTCR ===
+            # === 2. ReactiveTCR ===
             combo_key = f"{junction}_{v_call_str}"
             tcr_combinations.append(combo_key)
             
@@ -334,7 +334,7 @@ def _process_test_file_unified(args):
             'd_seq': d_seq,
             'd_gene': d_gene,
             'd_phys': d_phys,
-            # attTCR
+            # ReactiveTCR
             'tcr_combinations': tcr_unique,  # Unique, deterministic via seeded shuffle
             # XGB raw
             'xgb_raw': {
@@ -481,20 +481,20 @@ class ImmuneStatePredictor:
         self.num_reactive_tcrs = kwargs.get('num_reactive_tcrs', NUM_REACTIVE_TCRS)
         
         # Models (set after fit)
-        self.physicist_model = None
-        self.sniper_model = None
-        self.ecologist_model = None
-        self.atttcr_model = None
-        self.xgb_stat_model = None
-        self.xgb_freq_model = None
+        self.physicochemical_model = None
+        self.kmer_model = None
+        self.vjgene_model = None
+        self.reactive_tcr_model = None
+        self.statistical_model = None
+        self.frequency_model = None
         self.head_model = None
         
         # Data (set after fit)
         self.vocab = None
         self.train_data = None
-        self.atttcr_data = None
+        self.reactive_tcr_data = None
         self.xgb_data = None
-        self.atttcr_scores = None
+        self.reactive_tcr_scores = None
         self.unique_sequences_df = None
         self.head_weights = None
         self.dataset_num = None
@@ -543,12 +543,12 @@ class ImmuneStatePredictor:
         print(f"   Samples: {len(y)} (pos={sum(y)}, neg={len(y)-sum(y)})")
         print(f"   Features: Seq={X_seq.shape[1]}, Gene={X_gene.shape[1]}, Phys={X_phys.shape[1]}")
         
-        # --- STEP 2: Extract attTCR data ---
-        print("   🧬 Extracting attTCR data...")
-        self.atttcr_data = extract_tcrs_from_directory(
+        # --- STEP 2: Extract ReactiveTCR data ---
+        print("   🧬 Extracting ReactiveTCR data...")
+        self.reactive_tcr_data = extract_tcrs_from_directory(
             train_dir_path, labels_dict, self.n_jobs
         )
-        has_atttcr = self.atttcr_data is not None and self.atttcr_data['labels'] is not None
+        has_reactive_tcr = self.reactive_tcr_data is not None and self.reactive_tcr_data['labels'] is not None
         
         # --- STEP 3: Extract XGBoost data ---
         print("   📈 Extracting XGBoost features...")
@@ -559,11 +559,11 @@ class ImmuneStatePredictor:
         
         # --- STEP 4: Build meta-features via internal CV (FULLY PARALLEL) ---
         print("   🔄 Building meta-features (all folds parallel)...")
-        n_specialists = 3  # base: physicist, sniper, ecologist
-        if has_atttcr:
+        n_specialists = 3  # base: physicochemical, kmer, vjgene
+        if has_reactive_tcr:
             n_specialists += 1
         if has_xgb:
-            n_specialists += 2  # stat + freq
+            n_specialists += 2  # statistical + frequency
         
         meta_train = np.zeros((len(y), n_specialists))
         internal_cv = KFold(n_splits=5, shuffle=True, random_state=self.seed)
@@ -578,20 +578,20 @@ class ImmuneStatePredictor:
         
         for fold_idx, (i_tr, i_ho) in enumerate(internal_cv.split(y)):
             # Base specialists
-            all_jobs.append(delayed(train_physicist)(X_phys[i_tr], y[i_tr], X_phys[i_ho], self.seed))
+            all_jobs.append(delayed(train_physicochemical)(X_phys[i_tr], y[i_tr], X_phys[i_ho], self.seed))
             fold_info.append((fold_idx, 0, i_ho))
             
-            all_jobs.append(delayed(train_sniper)(X_seq[i_tr], y[i_tr], X_seq[i_ho], self.seed))
+            all_jobs.append(delayed(train_kmer)(X_seq[i_tr], y[i_tr], X_seq[i_ho], self.seed))
             fold_info.append((fold_idx, 1, i_ho))
             
-            all_jobs.append(delayed(train_ecologist)(X_gene[i_tr], y[i_tr], X_gene[i_ho], self.seed))
+            all_jobs.append(delayed(train_vjgene)(X_gene[i_tr], y[i_tr], X_gene[i_ho], self.seed))
             fold_info.append((fold_idx, 2, i_ho))
             
             spec_idx = 3
-            if has_atttcr:
+            if has_reactive_tcr:
                 all_jobs.append(delayed(train_atttcr_fold)(
-                    self.atttcr_data['patient_tcrs'],
-                    self.atttcr_data['labels'],
+                    self.reactive_tcr_data['patient_tcrs'],
+                    self.reactive_tcr_data['labels'],
                     i_tr, i_ho,
                     n_reactive=self.num_reactive_tcrs,
                     seed=self.seed
@@ -623,7 +623,7 @@ class ImmuneStatePredictor:
         # Reassemble results into meta_train
         for job_idx, (fold_idx, spec_idx, i_ho) in enumerate(fold_info):
             preds = all_results[job_idx][0]
-            # Handle attTCR None case
+            # Handle ReactiveTCR None case
             if preds is None:
                 preds = np.full(len(i_ho), 0.5)
             meta_train[i_ho, spec_idx] = preds
@@ -647,15 +647,15 @@ class ImmuneStatePredictor:
         
         # Build jobs for parallel execution
         final_jobs = [
-            delayed(train_physicist)(X_phys, y, X_phys, self.seed),
-            delayed(train_sniper)(X_seq, y, X_seq, self.seed),
-            delayed(train_ecologist)(X_gene, y, X_gene, self.seed),
+            delayed(train_physicochemical)(X_phys, y, X_phys, self.seed),
+            delayed(train_kmer)(X_seq, y, X_seq, self.seed),
+            delayed(train_vjgene)(X_gene, y, X_gene, self.seed),
         ]
         
-        if has_atttcr:
+        if has_reactive_tcr:
             final_jobs.append(delayed(train_atttcr_full)(
-                self.atttcr_data['patient_tcrs'],
-                self.atttcr_data['labels'],
+                self.reactive_tcr_data['patient_tcrs'],
+                self.reactive_tcr_data['labels'],
                 n_reactive=self.num_reactive_tcrs,
                 seed=self.seed
             ))
@@ -676,18 +676,18 @@ class ImmuneStatePredictor:
         final_results = Parallel(n_jobs=min(len(final_jobs), self.n_jobs))(final_jobs)
         
         # Extract models
-        _, self.physicist_model = final_results[0]
-        _, self.sniper_model = final_results[1]
-        _, self.ecologist_model = final_results[2]
+        _, self.physicochemical_model = final_results[0]
+        _, self.kmer_model = final_results[1]
+        _, self.vjgene_model = final_results[2]
         
         idx = 3
-        if has_atttcr:
-            self.atttcr_model, self.atttcr_scores = final_results[idx]
+        if has_reactive_tcr:
+            self.reactive_tcr_model, self.reactive_tcr_scores = final_results[idx]
             idx += 1
         
         if has_xgb:
-            self.xgb_stat_model, _ = final_results[idx]
-            self.xgb_freq_model, _ = final_results[idx + 1]
+            self.statistical_model, _ = final_results[idx]
+            self.frequency_model, _ = final_results[idx + 1]
         
         # --- STEP 7: Identify important sequences ---
         print("   🔬 Identifying important sequences...")
@@ -747,7 +747,7 @@ class ImmuneStatePredictor:
         gene_data, gene_row, gene_col = [], [], []
         phys_data, phys_row, phys_col = [], [], []
         
-        # attTCR
+        # ReactiveTCR
         patient_tcrs = {}
         
         # XGB
@@ -779,7 +779,7 @@ class ImmuneStatePredictor:
                 phys_row.append(row_idx)
                 phys_col.append(col)
             
-            # === attTCR ===
+            # === ReactiveTCR ===
             patient_tcrs[row_idx] = res['tcr_combinations']
             
             # === XGB ===
@@ -822,18 +822,18 @@ class ImmuneStatePredictor:
         final_preds = []
         
         # Base specialists
-        f1 = predict_with_model(self.physicist_model, X_phys_test)
-        f2 = predict_with_model(self.sniper_model, X_seq_test)
-        f3 = predict_with_model(self.ecologist_model, X_gene_test)
+        f1 = predict_with_model(self.physicochemical_model, X_phys_test)
+        f2 = predict_with_model(self.kmer_model, X_seq_test)
+        f3 = predict_with_model(self.vjgene_model, X_gene_test)
         final_preds.extend([f1, f2, f3])
         
-        # attTCR
-        if self.atttcr_model is not None:
-            f_att = predict_atttcr_test(self.atttcr_model, patient_tcrs)
+        # ReactiveTCR
+        if self.reactive_tcr_model is not None:
+            f_att = predict_atttcr_test(self.reactive_tcr_model, patient_tcrs)
             final_preds.append(f_att)
         
         # XGB
-        if self.xgb_stat_model is not None and xgb_stat_rows:
+        if self.statistical_model is not None and xgb_stat_rows:
             # Build XGB feature matrices
             stat_df = pd.DataFrame(xgb_stat_rows)
             freq_df = pd.DataFrame(xgb_freq_rows)
@@ -853,8 +853,8 @@ class ImmuneStatePredictor:
             X_freq_test = np.nan_to_num(freq_df.values.astype(np.float32))
             
             # Map predictions back to full sample order
-            f_xgb_stat_partial = predict_xgb_test(self.xgb_stat_model, X_stat_test)
-            f_xgb_freq_partial = predict_xgb_test(self.xgb_freq_model, X_freq_test)
+            f_xgb_stat_partial = predict_xgb_test(self.statistical_model, X_stat_test)
+            f_xgb_freq_partial = predict_xgb_test(self.frequency_model, X_freq_test)
             
             # Expand to full sample size
             f_xgb_stat = np.full(n_samples, 0.5)
@@ -877,14 +877,14 @@ class ImmuneStatePredictor:
             best_weight_idx = np.argmax(np.abs(self.head_weights))
             if np.abs(self.head_weights[best_weight_idx]) > 0.01:
                 preds = final_preds[best_weight_idx]
-                spec_names = ['Physicist', 'Sniper', 'Ecologist', 'attTCR', 'XGB-Stat', 'XGB-Freq']
+                spec_names = ['Physicochemical', 'Kmer', 'VJGene', 'ReactiveTCR', 'Statistical', 'Frequency']
                 print(f"      ⚠️ Using {spec_names[best_weight_idx]} (highest weight)")
             elif len(final_preds) > 3:
-                # Use attTCR as fallback
+                # Use ReactiveTCR as fallback
                 preds = final_preds[3]
-                print(f"      ⚠️ HEAD weights all zero, using attTCR")
+                print(f"      ⚠️ HEAD weights all zero, using ReactiveTCR")
             else:
-                # No attTCR, use average
+                # No ReactiveTCR, use average
                 preds = np.mean(meta_test, axis=1)
                 print(f"      ⚠️ HEAD weights all zero, using average")
         
@@ -924,9 +924,9 @@ class ImmuneStatePredictor:
             return self._generate_empty_sequences_df(dataset_name)
         
         # Get model weights
-        phys_weights = get_model_weights(self.physicist_model)
-        seq_weights = get_model_weights(self.sniper_model)
-        gene_weights = get_model_weights(self.ecologist_model)
+        phys_weights = get_model_weights(self.physicochemical_model)
+        seq_weights = get_model_weights(self.kmer_model)
+        gene_weights = get_model_weights(self.vjgene_model)
         
         # Use first 3 head weights for base specialists
         head_w = self.head_weights[:3] if self.head_weights is not None else np.array([1.0, 1.0, 1.0])
@@ -940,13 +940,13 @@ class ImmuneStatePredictor:
         
         self.unique_sequences_df['importance_score'] = scores
         
-        # Add attTCR chi-squared scores if available
-        if self.atttcr_scores and len(self.head_weights) > 3:
+        # Add ReactiveTCR chi-squared scores if available
+        if self.reactive_tcr_scores and len(self.head_weights) > 3:
             att_weight = self.head_weights[3]
-            print(f"      Adding attTCR scores (weight={att_weight:.3f})...")
+            print(f"      Adding ReactiveTCR scores (weight={att_weight:.3f})...")
             keys = (self.unique_sequences_df['junction_aa'].astype(str) + '_' + 
                    self.unique_sequences_df['v_call'].astype(str))
-            chi_additions = keys.map(lambda k: self.atttcr_scores.get(k, 0.0) * att_weight)
+            chi_additions = keys.map(lambda k: self.reactive_tcr_scores.get(k, 0.0) * att_weight)
             self.unique_sequences_df['importance_score'] += chi_additions
         
         # Select top sequences
