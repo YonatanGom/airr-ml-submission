@@ -27,22 +27,10 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-
-### Command Line Interface
 ```bash
 python3 -m submission.main \
     --train_dir /path/to/train_dataset_1 \
     --test_dirs /path/to/test_dataset_1 \
-    --out_dir /path/to/output \
-    --n_jobs 10 \
-    --device cpu
-```
-
-### Multiple Test Sets
-```bash
-python3 -m submission.main \
-    --train_dir /path/to/train_dataset_7 \
-    --test_dirs /path/to/test_dataset_7_1 /path/to/test_dataset_7_2 \
     --out_dir /path/to/output \
     --n_jobs 10 \
     --device cpu
@@ -58,20 +46,3 @@ docker run -v /path/to/data:/data -v /path/to/output:/output immune-predictor \
     --out_dir /output \
     --n_jobs 10
 ```
-
-## Project Structure
-```
-submission/
-├── __init__.py              # Package initialization
-├── main.py                  # CLI entry point
-├── predictor.py             # ImmuneStatePredictor class
-├── feature_extraction.py    # Feature extraction
-├── base_specialists.py      # Physicochemical, Kmer, VJGene
-├── atttcr_specialist.py     # ReactiveTCR specialist
-├── xgboost_specialist.py    # Statistical and Frequency specialists
-└── utils.py                 # Utility functions
-```
-
-## License
-
-Open-source for research purposes.
