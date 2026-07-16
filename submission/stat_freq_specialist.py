@@ -38,7 +38,7 @@ AMINO_ACIDS = list('ACDEFGHIKLMNPQRSTVWY')
 AA_SET = set(AMINO_ACIDS)
 
 # Dataset-specific hyperparameters
-XGB_STAT_PARAMS = {
+STAT_PARAMS = {
     1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
     2: {'min_effect': 0.1, 'max_features': 25, 'C': 0.1},
     3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
@@ -49,7 +49,7 @@ XGB_STAT_PARAMS = {
     8: {'min_effect': 0.1, 'max_features': 100, 'C': 0.01},
 }
 
-XGB_FREQ_PARAMS = {
+FREQ_PARAMS = {
     1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
     2: {'min_effect': 0.1, 'max_features': 50, 'C': 0.1},
     3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
@@ -332,11 +332,11 @@ def compute_frequency_features(raw, all_v_genes, all_j_genes):
 # FEATURE EXTRACTION FROM DIRECTORY
 # ============================================================================
 
-def extract_xgb_features_from_directory(data_dir: str, labels_dict: dict = None,
+def extract_sf_features_from_directory(data_dir: str, labels_dict: dict = None,
                                          all_v_genes: list = None, all_j_genes: list = None,
                                          n_cores: int = None):
     """
-    Extract XGB features from all files in a directory.
+    Extract SF features from all files in a directory.
     
     Args:
         data_dir: Path to directory with TSV files
@@ -372,7 +372,7 @@ def extract_xgb_features_from_directory(data_dir: str, labels_dict: dict = None,
     
     with Pool(n_cores) as p:
         results = list(tqdm(p.imap(extract_raw_wrapper, tasks),
-                           total=len(tasks), desc="   Extracting XGB features"))
+                           total=len(tasks), desc="   Extracting SF features"))
     
     # Compute features
     stat_rows = []
@@ -493,10 +493,10 @@ def select_features_by_effect(X, y, feature_names, min_effect=0.15, max_features
 # FOLD-BASED TRAINING (NO DATA LEAKAGE)
 # ============================================================================
 
-def train_xgb_fold(X_all, y_all, train_idx, val_idx, feature_names,
+def train_sf_fold(X_all, y_all, train_idx, val_idx, feature_names,
                    min_effect=0.15, max_features=50, C=0.1, seed=42):
     """
-    Train XGB specialist on a fold - feature selection on train_idx only.
+    Train SF specialist on a fold - feature selection on train_idx only.
     
     Args:
         X_all: Full feature matrix
@@ -545,10 +545,10 @@ def train_xgb_fold(X_all, y_all, train_idx, val_idx, feature_names,
     return val_preds, (clf, scaler, selected_idx), selected_names
 
 
-def train_xgb_full(X_all, y_all, feature_names,
+def train_sf_full(X_all, y_all, feature_names,
                    min_effect=0.15, max_features=50, C=0.1, seed=42):
     """
-    Train XGB specialist on full data for test prediction.
+    Train SF specialist on full data for test prediction.
     
     Returns:
         model: Trained model tuple (clf, scaler, selected_idx)
@@ -575,7 +575,7 @@ def train_xgb_full(X_all, y_all, feature_names,
     return (clf, scaler, selected_idx), selected_names
 
 
-def predict_xgb_test(model, X_test):
+def predict_sf_test(model, X_test):
     """
     Predict on test data using trained model.
     
@@ -598,7 +598,7 @@ def predict_xgb_test(model, X_test):
 # HIGH-LEVEL INTERFACE
 # ============================================================================
 
-def get_xgb_params(dataset_num: int, feature_type: str):
+def get_sf_params(dataset_num: int, feature_type: str):
     """
     Get hyperparameters for a dataset.
     
@@ -610,15 +610,15 @@ def get_xgb_params(dataset_num: int, feature_type: str):
         dict with min_effect, max_features, C
     """
     if feature_type == 'statistical':
-        return XGB_STAT_PARAMS.get(dataset_num, DEFAULT_PARAMS)
+        return STAT_PARAMS.get(dataset_num, DEFAULT_PARAMS)
     else:
-        return XGB_FREQ_PARAMS.get(dataset_num, DEFAULT_PARAMS)
+        return FREQ_PARAMS.get(dataset_num, DEFAULT_PARAMS)
 
 
-def extract_and_prepare_xgb_data(train_dir: str, test_dirs: list, labels_dict: dict,
+def extract_and_prepare_sf_data(train_dir: str, test_dirs: list, labels_dict: dict,
                                   n_cores: int = None):
     """
-    Extract XGB features from training and test directories.
+    Extract SF features from training and test directories.
     
     Args:
         train_dir: Path to training directory
@@ -644,7 +644,7 @@ def extract_and_prepare_xgb_data(train_dir: str, test_dirs: list, labels_dict: d
     
     # Extract training features
     print("   Extracting training features...")
-    train_data = extract_xgb_features_from_directory(
+    train_data = extract_sf_features_from_directory(
         str(train_dir), labels_dict, all_v_genes, all_j_genes, n_cores
     )
     
@@ -656,7 +656,7 @@ def extract_and_prepare_xgb_data(train_dir: str, test_dirs: list, labels_dict: d
             continue
         test_name = test_dir.name
         print(f"   Extracting {test_name} features...")
-        test_data[test_name] = extract_xgb_features_from_directory(
+        test_data[test_name] = extract_sf_features_from_directory(
             str(test_dir), None, all_v_genes, all_j_genes, n_cores
         )
     

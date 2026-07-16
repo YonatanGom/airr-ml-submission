@@ -39,16 +39,16 @@ from .base_specialists import (
     train_physicochemical, train_kmer, train_vjgene,
     predict_with_model, get_model_weights
 )
-from .atttcr_specialist import (
+from .reactive_tcr_specialist import (
     extract_tcrs_from_directory,
-    train_atttcr_fold, train_atttcr_full,
-    predict_atttcr_test
+    train_reactive_tcr_fold, train_reactive_tcr_full,
+    predict_reactive_tcr_test
 )
 from .stat_freq_specialist import (
-    extract_xgb_features_from_directory,
+    extract_sf_features_from_directory,
     discover_genes_from_files,
-    train_xgb_fold, train_xgb_full, predict_xgb_test,
-    get_xgb_params
+    train_sf_fold, train_sf_full, predict_sf_test,
+    get_sf_params
 )
 
 # --- CONFIG ---
@@ -181,7 +181,7 @@ def _process_test_file_unified(args):
     Process a single test file to extract ALL features in one pass:
     1. Base features (seq, gene, phys) for vectorization
     2. TCR combinations for ReactiveTCR
-    3. Raw counts for XGB features
+    3. Raw counts for SF features
     
     Args:
         args: Tuple of (filepath, v_seq, v_gene, v_phys, all_v_genes, all_j_genes)
@@ -194,7 +194,7 @@ def _process_test_file_unified(args):
     
     filepath, v_seq, v_gene, v_phys, all_v_genes, all_j_genes = args
     
-    # XGB constants
+    # SF constants
     CDR3_POS_START = 3
     CDR3_POS_END = 20
     CDR3_LEN_MIN = 8
@@ -225,14 +225,14 @@ def _process_test_file_unified(args):
         # === ReactiveTCR (TCR combinations) ===
         tcr_combinations = []
         
-        # === XGB raw counts ===
-        xgb_v_counts = Counter()
-        xgb_j_counts = Counter()
-        xgb_length_counts = Counter()
-        xgb_global_aa_counts = Counter()
-        xgb_aa_pos_counts = defaultdict(Counter)
-        xgb_cdr3_lengths = []
-        xgb_n_valid = 0
+        # === SF raw counts ===
+        sf_v_counts = Counter()
+        sf_j_counts = Counter()
+        sf_length_counts = Counter()
+        sf_global_aa_counts = Counter()
+        sf_aa_pos_counts = defaultdict(Counter)
+        sf_cdr3_lengths = []
+        sf_n_valid = 0
         
         for row in df.itertuples(index=False):
             junction = getattr(row, 'junction_aa', None)
@@ -301,25 +301,25 @@ def _process_test_file_unified(args):
             combo_key = f"{junction}_{v_call_str}"
             tcr_combinations.append(combo_key)
             
-            # === 3. XGB features ===
+            # === 3. SF features ===
             if CDR3_LEN_MIN <= len(junction) <= CDR3_LEN_MAX and all(c in AA_SET for c in junction):
-                xgb_n_valid += 1
-                xgb_length_counts[len(junction)] += 1
-                xgb_cdr3_lengths.append(len(junction))
+                sf_n_valid += 1
+                sf_length_counts[len(junction)] += 1
+                sf_cdr3_lengths.append(len(junction))
                 
                 v_gene_clean = get_v_gene_clean(v_call)
                 if v_gene_clean:
-                    xgb_v_counts[v_gene_clean] += 1
+                    sf_v_counts[v_gene_clean] += 1
                 
                 j_gene_clean = get_j_gene_clean(j_call)
                 if j_gene_clean:
-                    xgb_j_counts[j_gene_clean] += 1
+                    sf_j_counts[j_gene_clean] += 1
                 
                 for aa in junction:
-                    xgb_global_aa_counts[aa] += 1
+                    sf_global_aa_counts[aa] += 1
                 
                 for pos in range(CDR3_POS_START, min(len(junction), CDR3_POS_END)):
-                    xgb_aa_pos_counts[pos][junction[pos]] += 1
+                    sf_aa_pos_counts[pos][junction[pos]] += 1
         
         del df
         
@@ -336,15 +336,15 @@ def _process_test_file_unified(args):
             'd_phys': d_phys,
             # ReactiveTCR
             'tcr_combinations': tcr_unique,  # Unique, deterministic via seeded shuffle
-            # XGB raw
-            'xgb_raw': {
-                'v_counts': xgb_v_counts,
-                'j_counts': xgb_j_counts,
-                'length_counts': xgb_length_counts,
-                'global_aa_counts': xgb_global_aa_counts,
-                'aa_pos_counts': dict(xgb_aa_pos_counts),
-                'cdr3_lengths': xgb_cdr3_lengths,
-                'n_valid': xgb_n_valid
+            # SF raw
+            'sf_raw': {
+                'v_counts': sf_v_counts,
+                'j_counts': sf_j_counts,
+                'length_counts': sf_length_counts,
+                'global_aa_counts': sf_global_aa_counts,
+                'aa_pos_counts': dict(sf_aa_pos_counts),
+                'cdr3_lengths': sf_cdr3_lengths,
+                'n_valid': sf_n_valid
             },
             'all_v_genes': all_v_genes,
             'all_j_genes': all_j_genes
@@ -354,8 +354,8 @@ def _process_test_file_unified(args):
         return None
 
 
-def _compute_xgb_features_from_raw(raw, all_v_genes, all_j_genes):
-    """Compute XGB stat and freq features from raw counts."""
+def _compute_sf_features_from_raw(raw, all_v_genes, all_j_genes):
+    """Compute SF stat and freq features from raw counts."""
     from scipy import stats as scipy_stats
     
     AMINO_ACIDS = list('ACDEFGHIKLMNPQRSTVWY')
@@ -493,7 +493,7 @@ class ImmuneStatePredictor:
         self.vocab = None
         self.train_data = None
         self.reactive_tcr_data = None
-        self.xgb_data = None
+        self.sf_data = None
         self.reactive_tcr_scores = None
         self.unique_sequences_df = None
         self.head_weights = None
@@ -552,25 +552,25 @@ class ImmuneStatePredictor:
         
         # --- STEP 3: Extract statistical/frequency data ---
         print("   📈 Extracting statistical/frequency features...")
-        self.xgb_data = extract_xgb_features_from_directory(
+        self.sf_data = extract_sf_features_from_directory(
             train_dir_path, labels_dict, n_cores=self.n_jobs
         )
-        has_xgb = self.xgb_data is not None and self.xgb_data['y'] is not None
+        has_sf = self.sf_data is not None and self.sf_data['y'] is not None
         
         # --- STEP 4: Build meta-features via internal CV (FULLY PARALLEL) ---
         print("   🔄 Building meta-features (all folds parallel)...")
         n_specialists = 3  # base: physicochemical, kmer, vjgene
         if has_reactive_tcr:
             n_specialists += 1
-        if has_xgb:
+        if has_sf:
             n_specialists += 2  # statistical + frequency
         
         meta_train = np.zeros((len(y), n_specialists))
         internal_cv = KFold(n_splits=5, shuffle=True, random_state=self.seed)
         
-        # Get XGB params
-        xgb_stat_params = get_xgb_params(self.dataset_num, 'statistical')
-        xgb_freq_params = get_xgb_params(self.dataset_num, 'frequency')
+        # Get SF params
+        stat_params = get_sf_params(self.dataset_num, 'statistical')
+        freq_params = get_sf_params(self.dataset_num, 'frequency')
         
         # Build ALL jobs for ALL folds at once
         all_jobs = []
@@ -589,7 +589,7 @@ class ImmuneStatePredictor:
             
             spec_idx = 3
             if has_reactive_tcr:
-                all_jobs.append(delayed(train_atttcr_fold)(
+                all_jobs.append(delayed(train_reactive_tcr_fold)(
                     self.reactive_tcr_data['patient_tcrs'],
                     self.reactive_tcr_data['labels'],
                     i_tr, i_ho,
@@ -599,20 +599,20 @@ class ImmuneStatePredictor:
                 fold_info.append((fold_idx, spec_idx, i_ho))
                 spec_idx += 1
             
-            if has_xgb:
-                all_jobs.append(delayed(train_xgb_fold)(
-                    self.xgb_data['X_stat'], self.xgb_data['y'],
+            if has_sf:
+                all_jobs.append(delayed(train_sf_fold)(
+                    self.sf_data['X_stat'], self.sf_data['y'],
                     i_tr, i_ho,
-                    self.xgb_data['stat_feature_names'],
-                    **xgb_stat_params, seed=self.seed
+                    self.sf_data['stat_feature_names'],
+                    **stat_params, seed=self.seed
                 ))
                 fold_info.append((fold_idx, spec_idx, i_ho))
                 
-                all_jobs.append(delayed(train_xgb_fold)(
-                    self.xgb_data['X_freq'], self.xgb_data['y'],
+                all_jobs.append(delayed(train_sf_fold)(
+                    self.sf_data['X_freq'], self.sf_data['y'],
                     i_tr, i_ho,
-                    self.xgb_data['freq_feature_names'],
-                    **xgb_freq_params, seed=self.seed
+                    self.sf_data['freq_feature_names'],
+                    **freq_params, seed=self.seed
                 ))
                 fold_info.append((fold_idx, spec_idx + 1, i_ho))
         
@@ -653,23 +653,23 @@ class ImmuneStatePredictor:
         ]
         
         if has_reactive_tcr:
-            final_jobs.append(delayed(train_atttcr_full)(
+            final_jobs.append(delayed(train_reactive_tcr_full)(
                 self.reactive_tcr_data['patient_tcrs'],
                 self.reactive_tcr_data['labels'],
                 n_reactive=self.num_reactive_tcrs,
                 seed=self.seed
             ))
         
-        if has_xgb:
-            final_jobs.append(delayed(train_xgb_full)(
-                self.xgb_data['X_stat'], self.xgb_data['y'],
-                self.xgb_data['stat_feature_names'],
-                **xgb_stat_params, seed=self.seed
+        if has_sf:
+            final_jobs.append(delayed(train_sf_full)(
+                self.sf_data['X_stat'], self.sf_data['y'],
+                self.sf_data['stat_feature_names'],
+                **stat_params, seed=self.seed
             ))
-            final_jobs.append(delayed(train_xgb_full)(
-                self.xgb_data['X_freq'], self.xgb_data['y'],
-                self.xgb_data['freq_feature_names'],
-                **xgb_freq_params, seed=self.seed
+            final_jobs.append(delayed(train_sf_full)(
+                self.sf_data['X_freq'], self.sf_data['y'],
+                self.sf_data['freq_feature_names'],
+                **freq_params, seed=self.seed
             ))
         
         # Run all in parallel (loky backend for determinism)
@@ -685,7 +685,7 @@ class ImmuneStatePredictor:
             self.reactive_tcr_model, self.reactive_tcr_scores = final_results[idx]
             idx += 1
         
-        if has_xgb:
+        if has_sf:
             self.statistical_model, _ = final_results[idx]
             self.frequency_model, _ = final_results[idx + 1]
         
@@ -723,9 +723,9 @@ class ImmuneStatePredictor:
         
         test_files = sorted(glob.glob(os.path.join(test_dir_path, "*.tsv")))
         
-        # Get gene lists for XGB
-        all_v_genes = self.xgb_data['all_v_genes'] if self.xgb_data else []
-        all_j_genes = self.xgb_data['all_j_genes'] if self.xgb_data else []
+        # Get gene lists for SF
+        all_v_genes = self.sf_data['all_v_genes'] if self.sf_data else []
+        all_j_genes = self.sf_data['all_j_genes'] if self.sf_data else []
         
         # Prepare tasks
         v_seq = self.vocab['seq']
@@ -750,10 +750,10 @@ class ImmuneStatePredictor:
         # ReactiveTCR
         patient_tcrs = {}
         
-        # XGB
-        xgb_stat_rows = []
-        xgb_freq_rows = []
-        xgb_valid_indices = []
+        # SF
+        stat_rows = []
+        freq_rows = []
+        sf_valid_indices = []
         
         row_idx = 0
         for res in results:
@@ -782,15 +782,15 @@ class ImmuneStatePredictor:
             # === ReactiveTCR ===
             patient_tcrs[row_idx] = res['tcr_combinations']
             
-            # === XGB ===
-            if res['xgb_raw']['n_valid'] > 0:
-                stat_feats, freq_feats = _compute_xgb_features_from_raw(
-                    res['xgb_raw'], all_v_genes, all_j_genes
+            # === SF ===
+            if res['sf_raw']['n_valid'] > 0:
+                stat_feats, freq_feats = _compute_sf_features_from_raw(
+                    res['sf_raw'], all_v_genes, all_j_genes
                 )
                 if stat_feats is not None:
-                    xgb_stat_rows.append(stat_feats)
-                    xgb_freq_rows.append(freq_feats)
-                    xgb_valid_indices.append(row_idx)
+                    stat_rows.append(stat_feats)
+                    freq_rows.append(freq_feats)
+                    sf_valid_indices.append(row_idx)
             
             row_idx += 1
         
@@ -829,42 +829,42 @@ class ImmuneStatePredictor:
         
         # ReactiveTCR
         if self.reactive_tcr_model is not None:
-            f_att = predict_atttcr_test(self.reactive_tcr_model, patient_tcrs)
+            f_att = predict_reactive_tcr_test(self.reactive_tcr_model, patient_tcrs)
             final_preds.append(f_att)
         
-        # XGB
-        if self.statistical_model is not None and xgb_stat_rows:
-            # Build XGB feature matrices
-            stat_df = pd.DataFrame(xgb_stat_rows)
-            freq_df = pd.DataFrame(xgb_freq_rows)
+        # SF
+        if self.statistical_model is not None and stat_rows:
+            # Build SF feature matrices
+            stat_df = pd.DataFrame(stat_rows)
+            freq_df = pd.DataFrame(freq_rows)
             
             # Align columns with training
-            for col in self.xgb_data['stat_feature_names']:
+            for col in self.sf_data['stat_feature_names']:
                 if col not in stat_df.columns:
                     stat_df[col] = 0.0
-            stat_df = stat_df[self.xgb_data['stat_feature_names']]
+            stat_df = stat_df[self.sf_data['stat_feature_names']]
             
-            for col in self.xgb_data['freq_feature_names']:
+            for col in self.sf_data['freq_feature_names']:
                 if col not in freq_df.columns:
                     freq_df[col] = 0.0
-            freq_df = freq_df[self.xgb_data['freq_feature_names']]
+            freq_df = freq_df[self.sf_data['freq_feature_names']]
             
             X_stat_test = np.nan_to_num(stat_df.values.astype(np.float32))
             X_freq_test = np.nan_to_num(freq_df.values.astype(np.float32))
             
             # Map predictions back to full sample order
-            f_xgb_stat_partial = predict_xgb_test(self.statistical_model, X_stat_test)
-            f_xgb_freq_partial = predict_xgb_test(self.frequency_model, X_freq_test)
+            f_stat_partial = predict_sf_test(self.statistical_model, X_stat_test)
+            f_freq_partial = predict_sf_test(self.frequency_model, X_freq_test)
             
             # Expand to full sample size
-            f_xgb_stat = np.full(n_samples, 0.5)
-            f_xgb_freq = np.full(n_samples, 0.5)
-            for i, idx in enumerate(xgb_valid_indices):
-                f_xgb_stat[idx] = f_xgb_stat_partial[i]
-                f_xgb_freq[idx] = f_xgb_freq_partial[i]
+            f_stat = np.full(n_samples, 0.5)
+            f_freq = np.full(n_samples, 0.5)
+            for i, idx in enumerate(sf_valid_indices):
+                f_stat[idx] = f_stat_partial[i]
+                f_freq[idx] = f_freq_partial[i]
             
-            final_preds.append(f_xgb_stat)
-            final_preds.append(f_xgb_freq)
+            final_preds.append(f_stat)
+            final_preds.append(f_freq)
         
         # --- Combine with HEAD ---
         meta_test = np.column_stack(final_preds)

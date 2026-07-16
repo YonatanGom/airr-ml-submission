@@ -252,10 +252,10 @@ def build_feature_matrix_for_indices(patient_tcrs, reactive_tcrs, indices):
 # TRAINING FUNCTIONS
 # ============================================================================
 
-def train_atttcr_fold(patient_tcrs, labels, train_indices, val_indices,
+def train_reactive_tcr_fold(patient_tcrs, labels, train_indices, val_indices,
                       n_reactive=NUM_REACTIVE_TCRS, seed=SEED):
     """
-    Train attTCR on a single fold with NO data leakage.
+    Train ReactiveTCR on a single fold with NO data leakage.
     
     1. Calculate chi-squared on train_indices ONLY
     2. Select reactive TCRs from train fold ONLY
@@ -311,9 +311,9 @@ def train_atttcr_fold(patient_tcrs, labels, train_indices, val_indices,
     return val_preds, (clf, scaler, reactive_tcrs, tcr_list), scores
 
 
-def train_atttcr_full(patient_tcrs, labels, n_reactive=NUM_REACTIVE_TCRS, seed=SEED):
+def train_reactive_tcr_full(patient_tcrs, labels, n_reactive=NUM_REACTIVE_TCRS, seed=SEED):
     """
-    Train attTCR on full dataset (for test prediction).
+    Train ReactiveTCR on full dataset (for test prediction).
     
     Args:
         patient_tcrs: dict mapping patient_idx -> list of TCR keys
@@ -353,7 +353,7 @@ def train_atttcr_full(patient_tcrs, labels, n_reactive=NUM_REACTIVE_TCRS, seed=S
     return (clf, scaler, reactive_tcrs, tcr_list), scores
 
 
-def predict_atttcr_test(model, test_patient_tcrs, test_indices=None):
+def predict_reactive_tcr_test(model, test_patient_tcrs, test_indices=None):
     """
     Predict on test data using trained model.
     
@@ -380,10 +380,10 @@ def predict_atttcr_test(model, test_patient_tcrs, test_indices=None):
 # HIGH-LEVEL INTERFACE
 # ============================================================================
 
-def extract_and_train_atttcr(train_dir: str, labels_dict: dict, n_cores: int = None,
+def extract_and_train_reactive_tcr(train_dir: str, labels_dict: dict, n_cores: int = None,
                               n_reactive: int = NUM_REACTIVE_TCRS, seed: int = SEED):
     """
-    Extract TCRs and train attTCR model on full training data.
+    Extract TCRs and train ReactiveTCR model on full training data.
     
     Args:
         train_dir: Path to training directory
@@ -404,7 +404,7 @@ def extract_and_train_atttcr(train_dir: str, labels_dict: dict, n_cores: int = N
         return None, None, None
     
     # Train model
-    model, scores = train_atttcr_full(
+    model, scores = train_reactive_tcr_full(
         train_data['patient_tcrs'],
         train_data['labels'],
         n_reactive=n_reactive,
@@ -414,7 +414,7 @@ def extract_and_train_atttcr(train_dir: str, labels_dict: dict, n_cores: int = N
     return model, train_data, scores
 
 
-def predict_atttcr_on_test_dir(model, test_dir: str, n_cores: int = None):
+def predict_reactive_tcr_on_test_dir(model, test_dir: str, n_cores: int = None):
     """
     Predict on test directory using trained model.
     
@@ -434,6 +434,6 @@ def predict_atttcr_on_test_dir(model, test_dir: str, n_cores: int = None):
     test_data = extract_tcrs_from_directory(test_dir, labels_dict=None, n_cores=n_cores)
     
     # Predict
-    predictions = predict_atttcr_test(model, test_data['patient_tcrs'])
+    predictions = predict_reactive_tcr_test(model, test_data['patient_tcrs'])
     
     return predictions, test_data['patient_ids']
