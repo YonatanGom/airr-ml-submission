@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-XGBoost Specialist: Statistical & Frequency Features
+Statistical & Frequency Specialist (Logistic Regression with effect-size feature selection)
 
 Two specialists in one:
 - Statistical: Statistical features (entropy, gini, moments)

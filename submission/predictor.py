@@ -44,7 +44,7 @@ from .atttcr_specialist import (
     train_atttcr_fold, train_atttcr_full,
     predict_atttcr_test
 )
-from .xgboost_specialist import (
+from .stat_freq_specialist import (
     extract_xgb_features_from_directory,
     discover_genes_from_files,
     train_xgb_fold, train_xgb_full, predict_xgb_test,
@@ -550,8 +550,8 @@ class ImmuneStatePredictor:
         )
         has_reactive_tcr = self.reactive_tcr_data is not None and self.reactive_tcr_data['labels'] is not None
         
-        # --- STEP 3: Extract XGBoost data ---
-        print("   📈 Extracting XGBoost features...")
+        # --- STEP 3: Extract statistical/frequency data ---
+        print("   📈 Extracting statistical/frequency features...")
         self.xgb_data = extract_xgb_features_from_directory(
             train_dir_path, labels_dict, n_cores=self.n_jobs
         )
