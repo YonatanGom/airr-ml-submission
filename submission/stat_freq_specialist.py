@@ -37,28 +37,30 @@ CDR3_LEN_MAX = 29
 AMINO_ACIDS = list('ACDEFGHIKLMNPQRSTVWY')
 AA_SET = set(AMINO_ACIDS)
 
-# Dataset-specific hyperparameters
-STAT_PARAMS = {
-    1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
-    2: {'min_effect': 0.1, 'max_features': 25, 'C': 0.1},
-    3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
-    4: {'min_effect': 0.1, 'max_features': 25, 'C': 0.1},
-    5: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
-    6: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
-    7: {'min_effect': 0.2, 'max_features': 25, 'C': 0.01},
-    8: {'min_effect': 0.1, 'max_features': 100, 'C': 0.01},
-}
-
-FREQ_PARAMS = {
-    1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
-    2: {'min_effect': 0.1, 'max_features': 50, 'C': 0.1},
-    3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
-    4: {'min_effect': 0.1, 'max_features': 100, 'C': 0.1},
-    5: {'min_effect': 0.3, 'max_features': 25, 'C': 0.001},
-    6: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
-    7: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
-    8: {'min_effect': 0.1, 'max_features': 100, 'C': 0.01},
-}
+# The per-dataset hyperparameters below were tuned for the 8 datasets of Phase 1 of the
+# AIRR competition. The Phase-2 datasets are different, so we use DEFAULT_PARAMS for every
+# dataset instead (see get_sf_params). Kept here for reference:
+# STAT_PARAMS = {
+#     1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
+#     2: {'min_effect': 0.1, 'max_features': 25, 'C': 0.1},
+#     3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
+#     4: {'min_effect': 0.1, 'max_features': 25, 'C': 0.1},
+#     5: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
+#     6: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
+#     7: {'min_effect': 0.2, 'max_features': 25, 'C': 0.01},
+#     8: {'min_effect': 0.1, 'max_features': 100, 'C': 0.01},
+# }
+#
+# FREQ_PARAMS = {
+#     1: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
+#     2: {'min_effect': 0.1, 'max_features': 50, 'C': 0.1},
+#     3: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
+#     4: {'min_effect': 0.1, 'max_features': 100, 'C': 0.1},
+#     5: {'min_effect': 0.3, 'max_features': 25, 'C': 0.001},
+#     6: {'min_effect': 0.3, 'max_features': 25, 'C': 0.1},
+#     7: {'min_effect': 0.2, 'max_features': 25, 'C': 0.1},
+#     8: {'min_effect': 0.1, 'max_features': 100, 'C': 0.01},
+# }
 
 # Default params for unknown datasets
 DEFAULT_PARAMS = {'min_effect': 0.2, 'max_features': 25, 'C': 0.1}
@@ -609,10 +611,8 @@ def get_sf_params(dataset_num: int, feature_type: str):
     Returns:
         dict with min_effect, max_features, C
     """
-    if feature_type == 'statistical':
-        return STAT_PARAMS.get(dataset_num, DEFAULT_PARAMS)
-    else:
-        return FREQ_PARAMS.get(dataset_num, DEFAULT_PARAMS)
+    # All datasets use the default parameters (the per-dataset tables were Phase-1 only).
+    return DEFAULT_PARAMS
 
 
 def extract_and_prepare_sf_data(train_dir: str, test_dirs: list, labels_dict: dict,

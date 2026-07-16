@@ -10,7 +10,7 @@ ImmuneStatePredictor: Hybrid Stacking Ensemble Model
 - Statistical: Statistical features (entropy, moments)
 - Frequency: Frequency features (V/J/AA distributions)
 
-1 Head: LogisticRegressionCV with L1 regularization
+1 Head: LogisticRegressionCV with L2 regularization
 
 KEY FEATURE: max(HEAD, best_specialist) - never worse than best individual
 """
@@ -566,7 +566,8 @@ class ImmuneStatePredictor:
             n_specialists += 2  # statistical + frequency
         
         meta_train = np.zeros((len(y), n_specialists))
-        internal_cv = KFold(n_splits=5, shuffle=True, random_state=self.seed)
+        # Phase-2 setting. Phase 1 (the 8 datasets) used KFold here (with internal_cv.split(y) below).
+        internal_cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.seed)
         
         # Get SF params
         stat_params = get_sf_params(self.dataset_num, 'statistical')
@@ -576,7 +577,7 @@ class ImmuneStatePredictor:
         all_jobs = []
         fold_info = []  # Track (fold_idx, specialist_idx, holdout_indices)
         
-        for fold_idx, (i_tr, i_ho) in enumerate(internal_cv.split(y)):
+        for fold_idx, (i_tr, i_ho) in enumerate(internal_cv.split(y, y)):
             # Base specialists
             all_jobs.append(delayed(train_physicochemical)(X_phys[i_tr], y[i_tr], X_phys[i_ho], self.seed))
             fold_info.append((fold_idx, 0, i_ho))
@@ -632,8 +633,9 @@ class ImmuneStatePredictor:
         print("   🎯 Training HEAD ensemble...")
         self.head_model = LogisticRegressionCV(
             Cs=np.logspace(-2, 3, 20),
-            penalty='l1',
-            solver='saga',
+            # Phase-2 setting. Phase 1 (the 8 datasets) used penalty='l1', solver='saga'.
+            penalty='l2',
+            solver='lbfgs',
             cv=3,
             class_weight='balanced',
             max_iter=5000,
